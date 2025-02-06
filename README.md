@@ -13,8 +13,11 @@ prom-grafana-in-minikube with cadvisor
 5. For Verifications : 
 
 minikube service list
+
 minikube service grafana-service -n monitoring --url
+
 minikube service prometheus-service -n monitoring --url
+
 
 6. after create all resources in above file then , in broweser open grafana , promethesus and cadvisor.
 
