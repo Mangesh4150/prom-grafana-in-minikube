@@ -21,7 +21,7 @@ prom-grafana-in-minikube with cadvisor
 
 6. after create all resources in above file then , in broweser open grafana , promethesus and cadvisor.
 
-7. In Promethesus , check available target in ---> status--->target and ensure there are UP.
+7. In Promethesus , check available target in ---> status--->target and ensure there are UP. (cadvisor and node exporter)
 
 8. In Grafana , ---> data Sources ---> Add New Data source ---> promethesus ---> Give name and Prometheus server URL --> Save and Test.
 
