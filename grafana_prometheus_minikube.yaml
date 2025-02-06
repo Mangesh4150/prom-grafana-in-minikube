@@ -1,0 +1,248 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus-pv
+  namespace: monitoring
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data/prometheus"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  labels:
+    name: prometheus-config
+
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    rule_files: 
+      - "alerts.yml"
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      - job_name: 'cadvisor'
+        static_configs:
+          - targets: ['cadvisor-service.monitoring.svc.cluster.local:8083']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.37.0
+        args:
+          - "--config.file=/etc/prometheus/prometheus.yml"
+          - "--storage.tsdb.path=/prometheus"
+          - "--storage.tsdb.retention.time=30d"
+        ports:  
+          - containerPort: 9090
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/prometheus/
+          - name: storage-volume
+            mountPath: /prometheus
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-config
+        - name: storage-volume
+          persistentVolumeClaim:
+            claimName: prometheus-pvc
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-pv
+  namespace: monitoring
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data/grafana"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        volumeMounts:
+          - name: storage-volume
+            mountPath: /var/lib/grafana
+      volumes:
+        - name: storage-volume
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: monitoring
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring
+spec:
+  selector:
+    app: grafana
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cadvisor
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cadvisor
+  template:
+    metadata:
+      labels:
+        app: cadvisor
+    spec:
+      containers:
+      - name: cadvisor
+        image: gcr.io/cadvisor/cadvisor:latest
+        ports:
+          - containerPort: 8080
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        volumeMounts:
+          - name: rootfs
+            mountPath: /rootfs
+            readOnly: true
+          - name: docker-sock
+            mountPath: /var/run/docker.sock
+            readOnly: true
+          - name: sys
+            mountPath: /sys
+            readOnly: true
+          - name: varlibdocker
+            mountPath: /var/lib/docker
+            readOnly: true
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: varlibdocker
+          hostPath:
+            path: /var/lib/docker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cadvisor-service
+  namespace: monitoring
+spec:
+  selector:
+    app: cadvisor
+  ports:
+    - protocol: TCP
+      port: 8083
+      targetPort: 8080
+  type: NodePort
+
+

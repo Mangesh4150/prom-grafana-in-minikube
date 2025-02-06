@@ -1,0 +1,9 @@
+minikube addons enable metrics-server
+
+kubectl create namespace monitoring
+
+kubectl apply -f grafana_prometheus_minikube.yaml
+
+minikube service list
+minikube service grafana-service -n monitoring --url
+minikube service prometheus-service -n monitoring --url
